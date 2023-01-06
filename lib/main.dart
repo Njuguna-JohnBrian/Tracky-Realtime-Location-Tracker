@@ -1,7 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:tracky/keys.dart';
 import 'package:tracky/providers/location_provoder.dart';
 
 void main() {
@@ -28,71 +33,107 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class HomePage extends ConsumerWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
+  @override
+  ConsumerState<ConsumerStatefulWidget> createState() => _HomePageState();
+}
+
+class _HomePageState extends ConsumerState<HomePage> {
+  final Completer<GoogleMapController> _controller = Completer();
+  static const LatLng sourceLocation = LatLng(
+    37.33500926,
+    -122.03272188,
+  );
+  static const LatLng destination = LatLng(
+    37.33429383,
+    -122.06600055,
+  );
+
+  List<LatLng> polylineCoordinates = [];
+
+  void getPolyPoints() async {
+    PolylinePoints polylinePoints = PolylinePoints();
+
+    PolylineResult result = await polylinePoints.getRouteBetweenCoordinates(
+      ApiKey.api,
+      PointLatLng(
+        sourceLocation.latitude,
+        sourceLocation.longitude,
+      ),
+      PointLatLng(
+        destination.latitude,
+        destination.longitude,
+      ),
+    );
+
+    print("POUINTS: ${result.status}");
+    if (result.points.isNotEmpty) {
+      result.points.forEach(
+        (PointLatLng point) => polylineCoordinates.add(
+          LatLng(
+            point.latitude,
+            point.longitude,
+          ),
+        ),
+      );
+      setState(() {});
+    }
+  }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final location = ref.read(currentLocationProvider).value;
-    final double longitude;
-    final double latitude;
+  void initState() {
+    getPolyPoints();
+    super.initState();
+  }
 
-    if (location != null) {
-      longitude = location.longitude;
-      latitude = location.latitude;
-    } else {
-      longitude = 10.0;
-      latitude = 10.0;
-    }
-
+  @override
+  Widget build(BuildContext context) {
     return SafeArea(
       child: Scaffold(
-        body: ref.watch(currentLocationProvider).when(
-              data: (data) {
-                print("${data.latitude}, ${data.longitude}");
-                print("${data.speed}");
-                // return Text("Has Data, ${data.latitude}, ${data.longitude}");
-                return GoogleMap(
-                  initialCameraPosition: CameraPosition(
-                    target: LatLng(
-                      data.latitude,
-                      data.longitude,
-                    ),
-                    zoom: 14,
-                  ),
-                  markers: {
-                    Marker(
-                      markerId: const MarkerId(
-                        "Tracky",
-                      ),
-                      position: LatLng(
-                        data.latitude,
-                        data.longitude,
-                      ),
-                      draggable: true,
-                    )
-                  },
-                );
-              },
-              error: (e, s) {
-                print(e);
-                print(s);
-                return Text("Error");
-              },
-              loading: () => Text("Loading"),
+          body: GoogleMap(
+        initialCameraPosition: const CameraPosition(
+          target: sourceLocation,
+          zoom: 12,
+        ),
+        polylines: {
+          Polyline(
+            polylineId: PolylineId(
+              "route",
             ),
-      ),
+            points: polylineCoordinates,
+            color: Colors.red,
+            width: 6,
+          ),
+        },
+        markers: {
+          const Marker(
+            markerId: MarkerId(
+              "Source",
+            ),
+            position: sourceLocation,
+            draggable: true,
+          ),
+          const Marker(
+            markerId: MarkerId(
+              "Destination",
+            ),
+            position: destination,
+            draggable: true,
+          )
+        },
+      )),
     );
   }
 }
 
-final geolocator = GeolocatorPlatform.instance;
+// final geolocator = GeolocatorPlatform.instance;
 
-final currentLocationProvider = StreamProvider<Position>((ref) {
-  return Geolocator.getPositionStream(
-    locationSettings: LocationSettings(
-      accuracy: LocationAccuracy.best,
-      distanceFilter: 0.05.toInt(),
-    ),
-  );
-});
+// final currentLocationProvider = StreamProvider<Position>((ref) {
+//   return Geolocator.getPositionStream(
+//     locationSettings: LocationSettings(
+//       accuracy: LocationAccuracy.best,
+//       distanceFilter: 0.5.toInt(),
+//     ),
+//   );
+// });
