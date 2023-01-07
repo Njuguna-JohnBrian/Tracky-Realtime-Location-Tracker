@@ -66,7 +66,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       googleMapController.animateCamera(
         CameraUpdate.newCameraPosition(
           CameraPosition(
-            zoom: 12,
+            zoom: 15,
             target: LatLng(
               newLocation.latitude,
               newLocation.longitude,
@@ -156,7 +156,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 trafficEnabled: false,
                 initialCameraPosition: const CameraPosition(
                   target: sourceLocation,
-                  zoom: 12,
+                  zoom: 15,
                 ),
                 polylines: {
                   Polyline(
