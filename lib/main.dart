@@ -40,15 +40,48 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
+  final geolocator = GeolocatorPlatform.instance;
   final Completer<GoogleMapController> _controller = Completer();
+
+  BitmapDescriptor sourceIcon = BitmapDescriptor.defaultMarker;
+  BitmapDescriptor destinationIcon = BitmapDescriptor.defaultMarker;
+  BitmapDescriptor currentIcon = BitmapDescriptor.defaultMarker;
+
+  late Position currentLocation;
+
+  void getCurrentLocation() async {
+    await geolocator.getCurrentPosition().then((location) {
+      setState(() {
+        currentLocation = location;
+      });
+    });
+
+    GoogleMapController googleMapController = await _controller.future;
+
+    geolocator.getPositionStream().listen((newLocation) {
+      setState(() {
+        currentLocation = newLocation;
+      });
+
+      googleMapController.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(
+            zoom: 12,
+            target: LatLng(
+              newLocation.latitude,
+              newLocation.longitude,
+            ),
+          ),
+        ),
+      );
+    });
+  }
+
   static const LatLng sourceLocation = LatLng(
-    37.33500926,
-    -122.03272188,
+    -0.4338090,
+    36.9588860,
   );
-  static const LatLng destination = LatLng(
-    37.33429383,
-    -122.06600055,
-  );
+  static const LatLng destination = LatLng(-0.43056, 36.98046);
 
   List<LatLng> polylineCoordinates = [];
 
@@ -69,60 +102,106 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     print("POUINTS: ${result.status}");
     if (result.points.isNotEmpty) {
-      result.points.forEach(
-        (PointLatLng point) => polylineCoordinates.add(
+      for (var point in result.points) {
+        polylineCoordinates.add(
           LatLng(
             point.latitude,
             point.longitude,
           ),
-        ),
-      );
+        );
+      }
       setState(() {});
     }
   }
 
+  void setCustommarker() {
+    BitmapDescriptor.fromAssetImage(
+            ImageConfiguration.empty, "assets/Pin_source.png")
+        .then((icon) {
+      sourceIcon = icon;
+    });
+
+    BitmapDescriptor.fromAssetImage(
+            ImageConfiguration.empty, "assets/Pin_destination.png")
+        .then((icon) {
+      destinationIcon = icon;
+    });
+    BitmapDescriptor.fromAssetImage(
+            ImageConfiguration.empty, "assets/Pin_current_location.png")
+        .then((icon) {
+      currentIcon = icon;
+    });
+  }
+
   @override
   void initState() {
+    getCurrentLocation();
     getPolyPoints();
+    setCustommarker();
     super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
+    print(currentLocation);
     return SafeArea(
       child: Scaffold(
-          body: GoogleMap(
-        initialCameraPosition: const CameraPosition(
-          target: sourceLocation,
-          zoom: 12,
-        ),
-        polylines: {
-          Polyline(
-            polylineId: PolylineId(
-              "route",
-            ),
-            points: polylineCoordinates,
-            color: Colors.red,
-            width: 6,
-          ),
-        },
-        markers: {
-          const Marker(
-            markerId: MarkerId(
-              "Source",
-            ),
-            position: sourceLocation,
-            draggable: true,
-          ),
-          const Marker(
-            markerId: MarkerId(
-              "Destination",
-            ),
-            position: destination,
-            draggable: true,
-          )
-        },
-      )),
+        body: currentLocation == null
+            ? const Center(
+                child: Text("Loading...."),
+              )
+            : GoogleMap(
+                mapType: MapType.hybrid,
+                indoorViewEnabled: false,
+                trafficEnabled: false,
+                initialCameraPosition: const CameraPosition(
+                  target: sourceLocation,
+                  zoom: 12,
+                ),
+                polylines: {
+                  Polyline(
+                    polylineId: const PolylineId(
+                      "route",
+                    ),
+                    points: polylineCoordinates,
+                    color: Colors.red,
+                    width: 6,
+                  ),
+                },
+                markers: {
+                  Marker(
+                    markerId: const MarkerId(
+                      "Current Location",
+                    ),
+                    icon: currentIcon,
+                    position: LatLng(
+                      currentLocation.latitude,
+                      currentLocation.longitude,
+                    ),
+                    draggable: true,
+                  ),
+                  Marker(
+                    markerId: const MarkerId(
+                      "Source",
+                    ),
+                    icon: sourceIcon,
+                    position: sourceLocation,
+                    draggable: true,
+                  ),
+                  Marker(
+                    markerId: const MarkerId(
+                      "Destination",
+                    ),
+                    icon: destinationIcon,
+                    position: destination,
+                    draggable: true,
+                  )
+                },
+                onMapCreated: (mapController) {
+                  _controller.complete(mapController);
+                },
+              ),
+      ),
     );
   }
 }
